@@ -26,38 +26,41 @@ class OrderController extends Controller
         //
         $data = $request->validate([
             'car_id' => 'required',
-            'order_date' => 'required',
-            'pickup_date' => 'required',
-            'dropoff_date' => 'required',
-            'pickup_location' => 'required',
-            'dropoff_location' => 'required',
+            'order_date' => 'required|date',
+            'pickup_date' => 'required|date',
+            'dropoff_date' => 'required|date',
+            'pickup_location' => 'required|string',
+            'dropoff_location' => 'required|string',
         ]);
-        
-        $search = orders::selectRaw('DATE(dropoff_date) as date')
-            ->where('car_id', $request->car_id)
-            ->orderBy('id', 'DESC')
-            ->get();
 
-        $pickup_date = Carbon::parse($request->pickup_date);
-        $dropoff_date = Carbon::parse($search[0]->date);
-        // dd($orders[0]->date);
-        if ($pickup_date < $dropoff_date) {
-            return response()->json([
-                'message' => 'Failed !',
-            ]);
-        } else {
-            $orders = orders::create($data);
+        // Ambil tanggal dropoff terakhir untuk mobil terkait
+        $search = orders::where('car_id', $request->car_id)
+            ->orderBy('dropoff_date', 'DESC')
+            ->first();
+
+        if ($search) {
+            $pickup_date = Carbon::parse($request->pickup_date);
+            $last_dropoff_date = Carbon::parse($search->dropoff_date);
+
+            if ($pickup_date < $last_dropoff_date) {
+                return response()->json([
+                    'message' => 'Failed!',
+                ], 422);
+            }
         }
 
-        if ($orders) {
+        // Simpan order baru
+        $order = orders::create($data);
+
+        if ($order) {
             return response()->json([
                 'message' => 'Success',
-                'data' => $orders
+                'data' => $order
             ]);
         } else {
             return response()->json([
-                'message' => 'Failed !',
-            ]);
+                'message' => 'Failed!',
+            ], 500);
         }
     }
 
